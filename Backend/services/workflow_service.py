@@ -1,8 +1,7 @@
 from models.flow import Workflow
+from models.node import ApiCallNode, DelayNode 
 
-def validate_workflow(workflow: Workflow) -> bool:
-    """Validate workflow nodes and edges."""
-    from models.node import ApiCallNode, DelayNode
+def validate_workflow(workflow: Workflow) -> bool:     
     for node in workflow.nodes:
         node_data = node if isinstance(node, dict) else node.__dict__
         if node_data.get("type") == "delay":

@@ -106,9 +106,9 @@ export default function NodeConfigPanel() {
                   <SelectContent>
                     <SelectItem value="GET">GET</SelectItem>
                     <SelectItem value="POST">POST</SelectItem>
-                    {/* <SelectItem value="PUT">PUT</SelectItem>
+                    <SelectItem value="PUT">PUT</SelectItem>
                     <SelectItem value="DELETE">DELETE</SelectItem>
-                    <SelectItem value="PATCH">PATCH</SelectItem> */}
+                    <SelectItem value="PATCH">PATCH</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -168,12 +168,12 @@ export default function NodeConfigPanel() {
 
       {/* Footer */}
       <div className="p-6 border-t border-border flex gap-2">
-        {/* <Button variant="outline" size="sm" className="flex-1">
+        <Button variant="outline" size="sm" className="flex-1">
           Reset
         </Button>
         <Button size="sm" className="flex-1">
           Save Changes
-        </Button> */}
+        </Button>
       </div>
     </aside>
   );

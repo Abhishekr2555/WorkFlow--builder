@@ -9,7 +9,6 @@ export default function Home() {
     <div className="flex h-screen">
       <NodePalette />
       <div className="flex flex-col flex-1">
-        <ImportExportButtons />
         <FlowCanvas />
       </div>
       <NodeConfigPanel />

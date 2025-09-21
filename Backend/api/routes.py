@@ -2,7 +2,7 @@ from fastapi import APIRouter , HTTPException
 from pydantic import BaseModel
 from models.flow import Workflow
 from services.workflow_service import validate_workflow, execute_workflow
-from agents.workflow_agent import agent
+from agents import workflow_agent, run_workflow_agent
 
 router = APIRouter()
 
@@ -23,10 +23,15 @@ def execute(workflow: Workflow):
 class GenerateRequest(BaseModel):
     user_input: str
 
+# @router.post("/workflow/generate")
+# async def generate(request: GenerateRequest):
+#     response = await agent.run(request.user_input)
+#     return response
+
 @router.post("/workflow/generate")
-async def generate(request: GenerateRequest):
-    """
-    Takes natural language input and returns a workflow.
-    """
-    response = await agent.run(request.user_input)
-    return response
+def generate_workflow(req: GenerateRequest):
+    try:
+        workflow_json = run_workflow_agent(req.user_input)
+        return {"success": True, "workflow": workflow_json}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

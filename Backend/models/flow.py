@@ -11,11 +11,11 @@ class Edge(BaseModel):
     target: str
 
     class Config:
-        extra = Extra.allow   # ✅ allow extra fields from React Flow (like type, label, etc.)
+        extra = Extra.allow   
 
 class Workflow(BaseModel):
     nodes: List[Node]
     edges: List[Edge]
 
     class Config:
-        extra = Extra.allow   # ✅ allow extra fields in workflow too
+        extra = Extra.allow 

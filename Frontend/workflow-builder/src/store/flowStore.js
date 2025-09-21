@@ -14,7 +14,6 @@ export const useFlowStore = create((set) => ({
       const edges = state.edges.filter((e) => e.id !== id);
       return { edges, selectedEdge: null };
     }),
-  // Support both direct array sets and functional updates receiving current state
   setNodes: (updater) =>
     set((state) => ({
       nodes:
@@ -65,17 +64,48 @@ export const useFlowStore = create((set) => ({
       );
       return { nodes, edges, selectedNode: null };
     }),
-  updateNodeConfig: (id, data) =>
-    set((state) => ({
-      nodes: state.nodes.map((n) =>
-        n.id === id ? { ...n, data: { ...n.data, ...data } } : n
-      ),
-      selectedNode:
-        state.selectedNode?.id === id
-          ? {
-              ...state.selectedNode,
-              data: { ...state.selectedNode.data, ...data },
-            }
-          : state.selectedNode,
-    })),
+  // updateNodeConfig: (id, data) =>
+  //   set((state) => ({
+  //     nodes: state.nodes.map((n) =>
+  //       n.id === id ? { ...n, data: { ...n.data, ...data } } : n
+  //     ),
+  //     selectedNode:
+  //       state.selectedNode?.id === id
+  //         ? {
+  //             ...state.selectedNode,
+  //             data: { ...state.selectedNode.data, ...data },
+  //           }
+  //         : state.selectedNode,
+  //   })),
+  updateNodeConfig: (id, updates) =>
+    set((state) => {
+      const nodes = state.nodes.map((n) => {
+        if (n.id !== id) return n;
+
+        const newData = { ...n.data, ...updates };
+
+        if (updates.url && n.type === "apiCall") {
+          newData.label = `API: ${updates.url}`;
+        } else if (updates.condition && n.type === "condition") {
+          newData.label = `Condition: ${updates.condition}`;
+        } else if (updates.duration && n.type === "delay") {
+          newData.label = `Delay: ${updates.duration}s`;
+        } else if (updates.code && n.type === "python") {
+          newData.label = "Python Script";
+        }
+
+        return { ...n, data: newData };
+      });
+
+      return {
+        nodes,
+        selectedNode:
+          state.selectedNode?.id === id
+            ? {
+                ...state.selectedNode,
+                data: { ...state.selectedNode.data, ...updates },
+              }
+            : state.selectedNode,
+      };
+    }),
 }));

@@ -6,9 +6,7 @@ def _id():
     return str(uuid.uuid4())
 
 def parse_natural_language_to_workflow(text: str) -> Workflow:
-    """
-    Dummy parser – real one could use NLP or GPT.
-    """
+    
     nodes = []
     edges = []
 

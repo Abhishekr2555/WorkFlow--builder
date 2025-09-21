@@ -1,4 +1,5 @@
 "use client";
+
 import { useFlowStore } from "@/store/flowStore";
 import {
   Background,
@@ -14,6 +15,13 @@ import ApiCallNode from "./CustomNodes/ApiCallNode";
 import ConditionNode from "./CustomNodes/ConditionNode";
 import DelayNode from "./CustomNodes/DelayNode";
 import PythonNode from "./CustomNodes/PythonNode";
+import dagre from "dagre";
+
+// ✅ Importing Dialog + Chat UI from your provided code
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { CheckCircle, Play, X, Zap } from "lucide-react";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { Button } from "./ui/button";
 
 const nodeTypes = {
   apiCall: ApiCallNode,
@@ -30,6 +38,7 @@ export default function FlowCanvas() {
       type: node.type,
       position: node.position,
     }));
+
   const {
     nodes,
     edges,
@@ -43,6 +52,7 @@ export default function FlowCanvas() {
     selectedEdge,
     clearEdgeSelection,
   } = useFlowStore();
+
   const onEdgeClick = useCallback(
     (event, edge) => {
       setSelectedEdge(edge);
@@ -53,25 +63,88 @@ export default function FlowCanvas() {
   const backendUrl =
     process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
-  // --- Run workflow states ---
-  const [error, setError] = useState(null);
+  // --- Workflow states ---
   const [workflowOutput, setWorkflowOutput] = useState(null);
-  // --- Validate workflow states ---
+  const [isOutputOpen, setIsOutputOpen] = useState(false);
   const [validateResult, setValidateResult] = useState(null);
   const [validateLoading, setValidateLoading] = useState(false);
   const [validateError, setValidateError] = useState(null);
-
-  // --- Execute workflow states ---
   const [executeResult, setExecuteResult] = useState(null);
   const [executeLoading, setExecuteLoading] = useState(false);
   const [executeError, setExecuteError] = useState(null);
-
-  // --- Generate workflow states ---
   const [generateResult, setGenerateResult] = useState(null);
   const [generateLoading, setGenerateLoading] = useState(false);
   const [generateError, setGenerateError] = useState(null);
 
-  // --- Validate Workflow ---
+  const getLayoutedElements = (nodes, edges, direction = "TB") => {
+    if (!nodes || nodes.length === 0) {
+      return { nodes: [], edges: edges || [] };
+    }
+
+    const dagreGraph = new dagre.graphlib.Graph();
+    dagreGraph.setDefaultEdgeLabel(() => ({}));
+    dagreGraph.setGraph({
+      rankdir: direction,
+      nodesep: 50,
+      ranksep: 50,
+      marginx: 20,
+      marginy: 20,
+    });
+
+    const nodeWidth = 180;
+    const nodeHeight = 60;
+
+    nodes.forEach((node) => {
+      if (node.id) {
+        dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+      }
+    });
+
+    const addedEdges = new Set();
+    const validEdges = [];
+
+    (edges || []).forEach((edge) => {
+      const edgeKey = `${edge.source}-${edge.target}`;
+      if (
+        addedEdges.has(edgeKey) ||
+        edge.source === edge.target ||
+        !dagreGraph.hasNode(edge.source) ||
+        !dagreGraph.hasNode(edge.target)
+      ) {
+        return;
+      }
+      dagreGraph.setEdge(edge.source, edge.target);
+      addedEdges.add(edgeKey);
+      validEdges.push(edge);
+    });
+
+    try {
+      dagre.layout(dagreGraph);
+    } catch (error) {
+      console.error("Dagre layout error:", error);
+      return {
+        nodes: nodes.map((node, index) => ({
+          ...node,
+          position: { x: index * 200, y: 100 },
+        })),
+        edges: validEdges,
+      };
+    }
+
+    const layoutedNodes = nodes.map((node) => {
+      if (!node.id || !dagreGraph.hasNode(node.id)) {
+        return { ...node, position: node.position || { x: 0, y: 0 } };
+      }
+      const { x, y } = dagreGraph.node(node.id);
+      return {
+        ...node,
+        position: { x: x - nodeWidth / 2, y: y - nodeHeight / 2 },
+      };
+    });
+
+    return { nodes: layoutedNodes, edges: validEdges };
+  };
+
   const validateWorkflow = async () => {
     setValidateLoading(true);
     setValidateError(null);
@@ -92,7 +165,6 @@ export default function FlowCanvas() {
     }
   };
 
-  // --- Execute Workflow ---
   const executeWorkflow = async () => {
     setExecuteLoading(true);
     setExecuteError(null);
@@ -106,6 +178,8 @@ export default function FlowCanvas() {
       if (!response.ok) throw new Error("Execution failed");
       const data = await response.json();
       setExecuteResult(data.result || JSON.stringify(data, null, 2));
+      setWorkflowOutput(data.result || data || null);
+      setIsOutputOpen(true);
     } catch (err) {
       setExecuteError(err.message);
     } finally {
@@ -113,11 +187,61 @@ export default function FlowCanvas() {
     }
   };
 
-  // --- Generate Workflow ---
-  const generateWorkflow = async () => {
-    const userInput = prompt("Enter input for workflow generation:");
-    if (!userInput) return;
+  // const generateWorkflow = async (userInput) => {
+  //   if (!userInput) return;
+  //   setGenerateLoading(true);
+  //   setGenerateError(null);
+  //   setGenerateResult(null);
+  //   try {
+  //     const response = await fetch(`${backendUrl}/workflow/generate`, {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({ user_input: userInput }),
+  //     });
 
+  //     if (!response.ok) {
+  //       const errorText = await response.text();
+  //       throw new Error(`Generation failed: ${response.status} - ${errorText}`);
+  //     }
+
+  //     const data = await response.json();
+  //     const workflow = data?.workflow || data?.generated || data;
+  //     if (!workflow?.nodes || !Array.isArray(workflow.nodes)) {
+  //       throw new Error("Invalid workflow structure received from backend");
+  //     }
+
+  //     const mappedNodes = workflow.nodes.map((n, i) => ({
+  //       id: n.id ? n.id.toString() : `node-${i}`,
+  //       type: n.type || "default",
+  //       position: n.position || { x: i * 200, y: 100 },
+  //       data: { label: n.label || `${n.type || "Node"} (${n.id || i})`, ...n },
+  //     }));
+
+  //     const mappedEdges = (workflow.edges || []).map((e, i) => ({
+  //       id: e.id ? e.id.toString() : `edge-${i}`,
+  //       source: e.source || e.from || "",
+  //       target: e.target || e.to || "",
+  //       type: "smoothstep",
+  //     }));
+
+  //     if (mappedNodes.length > 0) {
+  //       const { nodes: layoutedNodes, edges: layoutedEdges } =
+  //         getLayoutedElements(mappedNodes, mappedEdges, "TB");
+  //       setNodes(layoutedNodes);
+  //       setEdges(layoutedEdges);
+  //       setGenerateResult(JSON.stringify(workflow, null, 2));
+  //     } else {
+  //       throw new Error("No nodes found in generated workflow");
+  //     }
+  //   } catch (err) {
+  //     setGenerateError(err.message);
+  //   } finally {
+  //     setGenerateLoading(false);
+  //   }
+  // };
+
+  const generateWorkflow = async (userInput) => {
+    if (!userInput) return;
     setGenerateLoading(true);
     setGenerateError(null);
     setGenerateResult(null);
@@ -128,13 +252,58 @@ export default function FlowCanvas() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_input: userInput,
+          current_workflow: {
+            nodes: transformNodes(nodes), // 👈 send current state
+            edges,
+          },
         }),
       });
 
-      if (!response.ok) throw new Error("Generation failed");
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Generation failed: ${response.status} - ${errorText}`);
+      }
 
       const data = await response.json();
-      setGenerateResult(data.generated || JSON.stringify(data, null, 2));
+      const workflow = data?.workflow || data?.generated || data;
+
+      if (!workflow?.nodes || !Array.isArray(workflow.nodes)) {
+        throw new Error("Invalid workflow structure received from backend");
+      }
+
+      // 🔧 Step 2: MERGE nodes & edges instead of replacing
+      const mappedNodes = workflow.nodes.map((n, i) => ({
+        id: n.id ? n.id.toString() : `node-${Date.now()}-${i}`,
+        type: n.type || "default",
+        position: n.position || { x: i * 200, y: 100 },
+        data: { label: n.label || `${n.type || "Node"} (${n.id || i})`, ...n },
+      }));
+
+      const mappedEdges = (workflow.edges || []).map((e, i) => ({
+        id: e.id ? e.id.toString() : `edge-${Date.now()}-${i}`,
+        source: e.source || e.from || "",
+        target: e.target || e.to || "",
+        type: "smoothstep",
+      }));
+
+      // merge with old
+      setNodes((prevNodes) => {
+        const existingIds = new Set(prevNodes.map((n) => n.id));
+        return [
+          ...prevNodes,
+          ...mappedNodes.filter((n) => !existingIds.has(n.id)), // avoid duplicates
+        ];
+      });
+
+      setEdges((prevEdges) => {
+        const existingIds = new Set(prevEdges.map((e) => e.id));
+        return [
+          ...prevEdges,
+          ...mappedEdges.filter((e) => !existingIds.has(e.id)), // avoid duplicates
+        ];
+      });
+
+      setGenerateResult(JSON.stringify(workflow, null, 2));
     } catch (err) {
       setGenerateError(err.message);
     } finally {
@@ -142,155 +311,111 @@ export default function FlowCanvas() {
     }
   };
 
-  const checkBackend = async () => {
-    try {
-      const response = await fetch(`${backendUrl}`);
-      if (!response.ok) throw new Error("Backend not responding");
-      const data = await response.json();
-      console.log("data:", data);
-      console.log("✅ Backend is working");
-    } catch (err) {
-      console.log(err.message);
-    }
-  };
-  // --- ReactFlow handlers ---
-  const onNodesChange = useCallback(
-    (changes) =>
-      setNodes((nds) =>
-        applyNodeChanges(changes, Array.isArray(nds) ? nds : [])
-      ),
-    [setNodes]
-  );
-
-  const onEdgesChange = useCallback(
-    (changes) =>
-      setEdges((eds) =>
-        applyEdgeChanges(changes, Array.isArray(eds) ? eds : [])
-      ),
-    [setEdges]
-  );
-
-  const onSelectionChange = useCallback(
-    ({ nodes: selectedNodes }) => {
-      if (Array.isArray(selectedNodes) && selectedNodes.length > 0) {
-        setSelectedNode(selectedNodes[0]);
-      } else {
-        clearSelection();
-      }
-    },
-    [setSelectedNode, clearSelection]
-  );
-
-  const onConnect = useCallback(
-    (connection) => {
-      setEdges((eds) => addEdge({ ...connection, type: "smoothstep" }, eds));
-    },
-    [setEdges]
-  );
-
-  const onDrop = useCallback(
-    (event) => {
-      event.preventDefault();
-      const type = event.dataTransfer.getData("application/reactflow");
-      const position = { x: event.clientX - 250, y: event.clientY - 50 };
-
-      let newNode = {
-        id: `${+new Date()}`,
-        type,
-        position,
-        data: { label: `${type} node` },
-      };
-
-      // Add required fields based on node type
-      switch (type) {
-        case "apiCall":
-          newNode.url = "https://example.com/api"; // default URL
-          newNode.method = "GET"; // default method
-          break;
-        case "python":
-          newNode.code = ""; // default empty code
-          break;
-        case "condition":
-          newNode.condition = ""; // default empty condition
-          break;
-        case "delay":
-          newNode.duration = 0; // default 0 seconds
-          break;
-        default:
-          break;
-      }
-
-      setNodes((nds) => nds.concat(newNode));
-    },
-    [setNodes]
-  );
-
-  const onDragOver = useCallback((event) => {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-  }, []);
-
-  const onKeyDown = useCallback(
-    (e) => {
-      if (e.key === "Delete" || e.key === "Backspace") {
-        deleteSelectedNode();
-      }
-    },
-    [deleteSelectedNode]
-  );
+  const [chatOpen, setChatOpen] = useState(false);
 
   return (
     <div className="flex-1 h-screen flex flex-col">
-      {/* Top Bar */}
-      <div className="p-4 flex items-center gap-4 bg-gray-50 border-b">
-        <button
-          onClick={validateWorkflow}
-          className="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700 transition"
-          disabled={validateLoading}
-        >
-          {validateLoading ? "Validating..." : "Validate"}
-        </button>
-        <button
-          onClick={executeWorkflow}
-          className="px-4 py-2 bg-purple-600 text-white rounded shadow hover:bg-purple-700 transition"
-          disabled={executeLoading}
-        >
-          {executeLoading ? "Executing..." : "Execute"}
-        </button>
-        <button
-          onClick={generateWorkflow}
-          className="px-4 py-2 bg-orange-600 text-white rounded shadow hover:bg-orange-700 transition"
-          disabled={generateLoading}
-        >
-          {generateLoading ? "Generating..." : "Generate"}
-        </button>
+      <div className="p-4 flex items-center justify-between bg-gray-50 border-b">
+        <h2 className="text-xl font-semibold">Workflow Builder</h2>
 
-        {/* <button
-          onClick={checkBackend}
-          className="px-4 py-2 bg-gray-700 text-white rounded shadow hover:bg-gray-800 transition"
-        >
-          Test
-        </button> */}
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={validateWorkflow}
+            variant="outline"
+            className="bg-blue-500 text-white hover:bg-blue-600"
+          >
+            <CheckCircle className="w-4 h-4 mr-2" />
+            Validate
+          </Button>
+          <Button
+            onClick={executeWorkflow}
+            variant="outline"
+            className="bg-green-500 text-white hover:bg-green-600"
+          >
+            <Play className="w-4 h-4 mr-2" />
+            Execute
+          </Button>
 
-        {(error || validateError || executeError || generateError) && (
-          <span className="text-red-500 text-sm">
-            {error || validateError || executeError || generateError}
-          </span>
-        )}
+          <DialogPrimitive.Root open={chatOpen} onOpenChange={setChatOpen}>
+            <DialogPrimitive.Trigger asChild>
+              <button className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-xl shadow hover:bg-purple-700 transition">
+                <Zap size={16} /> Generate
+              </button>
+            </DialogPrimitive.Trigger>
+
+            <DialogPrimitive.Portal>
+              <DialogPrimitive.Overlay className="fixed inset-0 bg-black/40" />
+              <DialogPrimitive.Content className="fixed bottom-4 right-4 w-96 bg-white rounded-2xl shadow-xl p-4 flex flex-col">
+                <DialogPrimitive.Title asChild>
+                  <VisuallyHidden>Generate Workflow</VisuallyHidden>
+                </DialogPrimitive.Title>
+
+                {/* Visible header */}
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="text-lg font-bold">Generate Workflow</h3>
+                  <DialogPrimitive.Close>
+                    <X size={18} className="cursor-pointer" />
+                  </DialogPrimitive.Close>
+                </div>
+
+                {/* Chat-like interface */}
+                <ChatInterface
+                  onSubmit={(msg) => {
+                    generateWorkflow(msg);
+                    setChatOpen(false);
+                  }}
+                />
+              </DialogPrimitive.Content>
+            </DialogPrimitive.Portal>
+          </DialogPrimitive.Root>
+        </div>
       </div>
 
-      {/* Canvas */}
+      {/* Output Dialog for workflow execution result */}
+      <DialogPrimitive.Root open={isOutputOpen} onOpenChange={setIsOutputOpen}>
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay className="fixed inset-0 bg-black/40" />
+          <DialogPrimitive.Content
+            className="fixed top-1/2 left-1/2 max-w-2xl max-h-[80vh] bg-white rounded-2xl shadow-xl p-4 flex flex-col"
+            style={{ transform: "translate(-50%, -50%)" }}
+          >
+            <DialogPrimitive.Title asChild>
+              <div className="text-lg font-bold mb-2">
+                Workflow Execution Output
+              </div>
+            </DialogPrimitive.Title>
+            <div className="p-4">
+              <h3 className="text-lg font-semibold mb-3">Execution Result</h3>
+              <div className="bg-gray-100 p-4 rounded-lg overflow-auto max-h-96 border">
+                <pre className="text-sm whitespace-pre-wrap text-gray-800">
+                  {workflowOutput
+                    ? JSON.stringify(workflowOutput, null, 2)
+                    : "No output available"}
+                </pre>
+              </div>
+            </div>
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
+
       <div
         className="flex-1"
-        onDrop={onDrop}
-        onDragOver={onDragOver}
-        onKeyDown={(e) => {
-          if ((e.key === "Delete" || e.key === "Backspace") && selectedEdge) {
-            deleteSelectedEdge();
-            clearEdgeSelection();
-          } else {
-            onKeyDown(e);
-          }
+        onDrop={(event) => {
+          event.preventDefault();
+          const type = event.dataTransfer.getData("application/reactflow");
+          const position = { x: event.clientX - 250, y: event.clientY - 50 };
+          setNodes((nds) =>
+            nds.concat({
+              id: `${+new Date()}`,
+              type,
+              position,
+              data: { label: `${type} node` },
+            })
+          );
+        }}
+        onDragOver={(event) => {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "move";
         }}
         tabIndex={0}
       >
@@ -298,11 +423,20 @@ export default function FlowCanvas() {
           nodes={Array.isArray(nodes) ? nodes : []}
           edges={Array.isArray(edges) ? edges : []}
           nodeTypes={nodeTypes}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onSelectionChange={onSelectionChange}
-          onConnect={onConnect}
+          onNodesChange={(changes) =>
+            setNodes((nds) => applyNodeChanges(changes, nds))
+          }
+          onEdgesChange={(changes) =>
+            setEdges((eds) => applyEdgeChanges(changes, eds))
+          }
+          onConnect={(connection) =>
+            setEdges((eds) =>
+              addEdge({ ...connection, type: "smoothstep" }, eds)
+            )
+          }
           onEdgeClick={onEdgeClick}
+          onNodeClick={(_, node) => setSelectedNode(node)} // 👈 NEW
+          onPaneClick={clearSelection}
           connectionMode="loose"
           defaultEdgeOptions={{ type: "smoothstep" }}
           fitView
@@ -311,35 +445,26 @@ export default function FlowCanvas() {
           <Controls />
         </ReactFlow>
       </div>
-
-      {/* Outputs Section */}
-      <div className="p-4 border-t bg-white shadow-inner space-y-4 max-h-80 overflow-y-auto">
-        {workflowOutput && (
-          <OutputBlock title="Workflow Output" content={workflowOutput} />
-        )}
-        {validateResult && (
-          <OutputBlock title="Validation Result" content={validateResult} />
-        )}
-        {executeResult && (
-          <OutputBlock title="Execution Result" content={executeResult} />
-        )}
-        {generateResult && (
-          <OutputBlock title="Generated Workflow" content={generateResult} />
-        )}
-      </div>
     </div>
   );
 }
 
-function OutputBlock({ title, content }) {
+function ChatInterface({ onSubmit }) {
+  const [message, setMessage] = useState("");
   return (
-    <div>
-      <h3 className="font-bold mb-2 text-lg text-green-700">{title}</h3>
-      <pre className="bg-gray-100 p-3 rounded text-sm overflow-auto">
-        {typeof content === "string"
-          ? content
-          : JSON.stringify(content, null, 2)}
-      </pre>
+    <div className="flex flex-col gap-3">
+      <textarea
+        className="border rounded-lg p-2 text-sm"
+        placeholder="Describe the workflow you want..."
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+      />
+      <button
+        onClick={() => onSubmit(message)}
+        className="bg-primary text-white py-2 rounded-lg shadow hover:opacity-90"
+      >
+        Generate
+      </button>
     </div>
   );
 }
