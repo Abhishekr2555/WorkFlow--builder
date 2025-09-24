@@ -64,7 +64,7 @@ export const useFlowStore = create((set) => ({
       );
       return { nodes, edges, selectedNode: null };
     }),
-  // updateNodeConfig: (id, data) =>
+
   //   set((state) => ({
   //     nodes: state.nodes.map((n) =>
   //       n.id === id ? { ...n, data: { ...n.data, ...data } } : n
@@ -108,4 +108,13 @@ export const useFlowStore = create((set) => ({
             : state.selectedNode,
       };
     }),
+  addNodes: (newNodes) =>
+    set((state) => ({
+      nodes: [...state.nodes, ...newNodes],
+    })),
+
+  addEdges: (newEdges) =>
+    set((state) => ({
+      edges: [...state.edges, ...newEdges],
+    })),
 }));

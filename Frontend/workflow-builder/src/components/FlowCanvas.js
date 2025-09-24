@@ -239,77 +239,87 @@ export default function FlowCanvas() {
   //     setGenerateLoading(false);
   //   }
   // };
+const generateWorkflow = async (userInput) => {
+  if (!userInput) return;
+  setGenerateLoading(true);
+  setGenerateError(null);
+  setGenerateResult(null);
 
-  const generateWorkflow = async (userInput) => {
-    if (!userInput) return;
-    setGenerateLoading(true);
-    setGenerateError(null);
-    setGenerateResult(null);
+  try {
+    const response = await fetch(`${backendUrl}/workflow/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_input: userInput,
+        current_workflow: { nodes: transformNodes(nodes), edges },
+      }),
+    });
 
-    try {
-      const response = await fetch(`${backendUrl}/workflow/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_input: userInput,
-          current_workflow: {
-            nodes: transformNodes(nodes), // 👈 send current state
-            edges,
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Generation failed: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json();
-      const workflow = data?.workflow || data?.generated || data;
-
-      if (!workflow?.nodes || !Array.isArray(workflow.nodes)) {
-        throw new Error("Invalid workflow structure received from backend");
-      }
-
-      // 🔧 Step 2: MERGE nodes & edges instead of replacing
-      const mappedNodes = workflow.nodes.map((n, i) => ({
-        id: n.id ? n.id.toString() : `node-${Date.now()}-${i}`,
-        type: n.type || "default",
-        position: n.position || { x: i * 200, y: 100 },
-        data: { label: n.label || `${n.type || "Node"} (${n.id || i})`, ...n },
-      }));
-
-      const mappedEdges = (workflow.edges || []).map((e, i) => ({
-        id: e.id ? e.id.toString() : `edge-${Date.now()}-${i}`,
-        source: e.source || e.from || "",
-        target: e.target || e.to || "",
-        type: "smoothstep",
-      }));
-
-      // merge with old
-      setNodes((prevNodes) => {
-        const existingIds = new Set(prevNodes.map((n) => n.id));
-        return [
-          ...prevNodes,
-          ...mappedNodes.filter((n) => !existingIds.has(n.id)), // avoid duplicates
-        ];
-      });
-
-      setEdges((prevEdges) => {
-        const existingIds = new Set(prevEdges.map((e) => e.id));
-        return [
-          ...prevEdges,
-          ...mappedEdges.filter((e) => !existingIds.has(e.id)), // avoid duplicates
-        ];
-      });
-
-      setGenerateResult(JSON.stringify(workflow, null, 2));
-    } catch (err) {
-      setGenerateError(err.message);
-    } finally {
-      setGenerateLoading(false);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Generation failed: ${response.status} - ${errorText}`);
     }
-  };
+
+    const data = await response.json();
+    const workflow = data?.workflow || data?.generated || data;
+    if (!workflow?.nodes || !Array.isArray(workflow.nodes)) {
+      throw new Error("Invalid workflow structure received from backend");
+    }
+
+    const mappedNodes = workflow.nodes.map((n, i) => ({
+      id: n.id ? String(n.id) : `node-${Date.now()}-${i}`,
+      type: n.type || "default",
+      position: n.position || { x: i * 200, y: 100 },
+      data: { label: n.label || `${n.type || "Node"} (${n.id || i})`, ...n },
+    }));
+
+    const newEdges = [];
+
+    // Connect new nodes step by step
+    const lastNode = nodes[nodes.length - 1]; // last existing node
+    mappedNodes.forEach((n, i) => {
+      if (i === 0 && lastNode) {
+        // connect first new node to last existing node
+        newEdges.push({
+          id: `edge-${lastNode.id}-${n.id}`,
+          source: lastNode.id,
+          target: n.id,
+          type: "smoothstep",
+        });
+      } else if (i > 0) {
+        // connect subsequent new nodes in sequence
+        newEdges.push({
+          id: `edge-${mappedNodes[i - 1].id}-${n.id}`,
+          source: mappedNodes[i - 1].id,
+          target: n.id,
+          type: "smoothstep",
+        });
+      }
+    });
+
+    // Merge nodes and edges
+    setNodes((prev) => {
+      const existing = new Set(prev.map((n) => n.id));
+      return [...prev, ...mappedNodes.filter((n) => !existing.has(n.id))];
+    });
+
+    setEdges((prev) => {
+      const existing = new Set(prev.map((e) => e.id));
+      return [
+        ...prev,
+        ...newEdges.filter((e) => !existing.has(e.id)), // avoid dupes
+      ];
+    });
+
+    setGenerateResult(JSON.stringify(workflow, null, 2));
+  } catch (err) {
+    setGenerateError(err.message);
+  } finally {
+    setGenerateLoading(false);
+  }
+};
+
+  
 
   const [chatOpen, setChatOpen] = useState(false);
 
