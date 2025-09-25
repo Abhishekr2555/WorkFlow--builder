@@ -40,7 +40,7 @@ The system consists of a **React Flow–based frontend** and a **Python backend 
 
 ## Tech Stack
 **Frontend**
-- React, React Flow  
+- React, React Flow , Nextjs
 - Zustand/Redux  
 - TailwindCSS / ShadCN UI  
 
