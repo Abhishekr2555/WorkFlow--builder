@@ -1,5 +1,7 @@
 # import os
 from dotenv import load_dotenv
+import uvicorn
+import os
 
 load_dotenv()
 
@@ -29,3 +31,9 @@ app.include_router(router, prefix="/api")
 @app.get("/")
 def root():
     return {"message": "AI Workflow Generator Backend is running"}
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))
+    host = os.getenv("HOST", "0.0.0.0")
+    
+    uvicorn.run("main:app", host=host, port=port)
