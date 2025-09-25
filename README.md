@@ -73,3 +73,10 @@ pip install -r requirements.txt
 
 uvicorn main:app --reload
 
+### Output
+<img width="1912" height="908" alt="image" src="https://github.com/user-attachments/assets/53e4ce18-d209-4b1b-9da5-5959aa31bea9" />
+<img width="1901" height="897" alt="image" src="https://github.com/user-attachments/assets/6d019599-3eec-46ce-84df-54eca37a5e36" />
+<img width="1917" height="902" alt="image" src="https://github.com/user-attachments/assets/b5f1a65b-723c-4d0b-bfee-e5627accba2a" />
+<img width="1894" height="912" alt="image" src="https://github.com/user-attachments/assets/eb6b82ff-b621-4d2b-8de9-551d2a8a4fc0" />
+
+
